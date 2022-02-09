@@ -1,51 +1,12 @@
-# This workflow runs when a ticket is created. It checks if the ticket
-# has the "DEPR" label, and if so, adds it to the DEPR board.
-# The "DEPR" label is auto-applied to all tickets created using the
-# `depr-ticket` template.
+# Run the workflow that adds DEPR labeled issues
+# to the org-wide DEPR project board
 
-name: Add newly created DEPR tickets to the DEPR project board
+name: Add newly created DEPR issues to the DEPR project board
+
 on:
   issues:
     types: [opened]
+
 jobs:
-  track_pr:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate token
-        id: generate_token
-        uses: tibdex/github-app-token@36464acb844fc53b9b8b2401da68844f6b05ebb0
-        with:
-          app_id: ${{ secrets.GRAPHQL_AUTH_APP_ID }}
-          private_key: ${{ secrets.GRAPHQL_AUTH_APP_PEM }}
-
-      - name: Get DEPR project ID
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ORGANIZATION: openedx
-          PROJECT_NUMBER: 9
-        run: |
-          gh api graphql -f query='
-            query($org: String!, $number: Int!) {
-              organization(login: $org){
-                projectNext(number: $number) {
-                  id
-                }
-              }
-            }' -f org=$ORGANIZATION -F number=$PROJECT_NUMBER > project_data.json
-
-          echo 'PROJECT_ID='$(jq '.data.organization.projectNext.id' project_data.json) >> $GITHUB_ENV
-
-      - name: Add DEPR issue to project
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ISSUE_ID: ${{ github.event.issue.node_id }}
-        if: contains(github.event.issue.labels.*.name, 'DEPR')
-        run: |
-          item_id="$( gh api graphql -f query='
-            mutation($project:ID!, $issue:ID!) {
-              addProjectNextItem(input: {projectId: $project, contentId: $issue}) {
-                projectNextItem {
-                  id
-                }
-              }
-            }' -f project=$PROJECT_ID -f issue=$ISSUE_ID --jq '.data.addProjectNextItem.projectNextItem.id')"
+  routeissue:
+    uses: openedx/.github/.github/workflows/add-depr-ticket-to-depr-board.yml@master
