@@ -8,56 +8,9 @@ on:
     types: [opened]
 
 jobs:
-  track_pr:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate token
-        if: contains(github.event.issue.labels.*.name, 'DEPR')
-        id: generate_token
-        uses: tibdex/github-app-token@36464acb844fc53b9b8b2401da68844f6b05ebb0
-        with:
-          app_id: ${{ secrets.GRAPHQL_AUTH_APP_ID }}
-          private_key: ${{ secrets.GRAPHQL_AUTH_APP_PEM }}
-
-      - name: Get DEPR project ID
-        if: contains(github.event.issue.labels.*.name, 'DEPR')
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ORGANIZATION: openedx
-          PROJECT_NUMBER: 9
-        run: |
-          gh api graphql -f query='
-            query($org: String!, $number: Int!) {
-              organization(login: $org){
-                projectNext(number: $number) {
-                  id
-                }
-              }
-            }' -f org=$ORGANIZATION -F number=$PROJECT_NUMBER > project_data.json
-
-          echo 'PROJECT_ID='$(jq '.data.organization.projectNext.id' project_data.json) >> $GITHUB_ENV
-
-      - name: Add DEPR issue to project
-        if: contains(github.event.issue.labels.*.name, 'DEPR')
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          ISSUE_ID: ${{ github.event.issue.node_id }}
-        run: |
-          item_id="$( gh api graphql -f query='
-            mutation($project:ID!, $issue:ID!) {
-              addProjectNextItem(input: {projectId: $project, contentId: $issue}) {
-                projectNextItem {
-                  id
-                }
-              }
-            }' -f project=$PROJECT_ID -f issue=$ISSUE_ID --jq '.data.addProjectNextItem.projectNextItem.id')"
-
-      - name: Alert in Slack
-        if: contains(github.event.issue.labels.*.name, 'DEPR')
-        id: slack
-        uses: slackapi/slack-github-action@v1.18.0
-        with:
-          channel-id: CGB0S3L12
-          slack-message: "Incoming DEPR ticket: ${{ github.event.issue.title }}\nAuthor: ${{ github.event.issue.user.login }}\nURL: ${{ github.event.issue.html_url }}\nText: ${{ github.event.issue.body }}"
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_ISSUE_BOT_TOKEN }}
+  routeissue:
+    uses: openedx/.github/.github/workflows/add-depr-ticket-to-depr-board.yml@master
+    secrets:
+      GITHUB_APP_ID: ${{ secrets.GRAPHQL_AUTH_APP_ID }}
+      GITHUB_APP_PRIVATE_KEY: ${{ secrets.GRAPHQL_AUTH_APP_PEM }}
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_ISSUE_BOT_TOKEN }}
